@@ -32,12 +32,18 @@ import sbt.{AutoPlugin, Def, _}
 import sbt.Keys._
 import java.io.File
 
+import org.opalj.releasehelper.transport.Transport
 import sbtrelease.ReleasePlugin
 
 
 /**
- * Plug-in to help with new releases
- */
+  * Plugin to help with the release process of OPAL.
+  * In this object there are all keys and settings that have been modified from the base plugin "sbt-release"
+  *
+  * Most of the credit goes to eed3si9n (Eugene Yokota) of sbt-release on which this builds
+  *
+  * @author Simon Leischnig
+  */
 object ReleaseHelperPlugin extends AutoPlugin {
 
 //    override def trigger = allRequirements
@@ -52,12 +58,10 @@ object ReleaseHelperPlugin extends AutoPlugin {
     val rhAllTests = taskKey[Unit]("execution of test and it:test")
 
     // tasks relating to the upload of the webpage
-    val rhWebpageBaseDirectory = taskKey[File]("the local base directory of the webpage")
-    val rhWebpageRemoteName = taskKey[String]("the name of the www directory on the remote server inside its configured base path")
+    val rhWebpageLocalDirectory = taskKey[File]("the local base directory of the webpage")
+    val rhWebpageRemoteWWWPath = taskKey[String]("the name of the www directory on the remote server inside its configured base path")
     val rhWebpageUploadConfig = taskKey[File]("Upload config file incl. login data for the website")
-
     val rhWebpageUpload = taskKey[Unit]("Upload task for the website")
-
     val rhRuntimeVersion = taskKey[String]("returns the runtime version, possibly changing throughout the release process")
 
     // debug task
@@ -67,31 +71,35 @@ object ReleaseHelperPlugin extends AutoPlugin {
   import autoImport._
   import sbtrelease.ReleasePlugin.autoImport._
 
+  /*
+  Convenience settings and tasks to be used by the OPAL root project
+   */
   lazy val opalBaseProjectConvenienceSettings: Seq[Def.Setting[_]] = Seq(
 
-    releasePublishArtifactsAction := publishLocal.value, //TODO: override with publishSigned task in clients, no dependency here
-    rhWebpageBaseDirectory := baseDirectory.value / "target" / "scala-2.11" / "resource_managed" / "site",  //TODO: integrate in task graph
-    rhWebpageRemoteName := "www",
+    rhWebpageLocalDirectory := baseDirectory.value / "target" / "scala-2.12" / "resource_managed" / "site",  //TODO: integrate in task graph
+    rhWebpageRemoteWWWPath := "/www",
     rhWebpageUploadConfig := (baseDirectory in ThisProject).value / "releasehelper.conf",
     rhWebpageUpload := {
       val cfgFile = rhWebpageUploadConfig.value
-      val localWWWDir = rhWebpageBaseDirectory.value
-      val remoteWWWName = rhWebpageRemoteName.value
+      val localWWWDir = rhWebpageLocalDirectory.value
+      val remoteWWWPath = rhWebpageRemoteWWWPath.value
       if(! cfgFile.exists()) {
         sys.error(s"The config file for the FTP transport of the OPAL website has not been found: $cfgFile. To be specified in taskKey 'rhWebpageUploadConfig'")
       }
       if(!localWWWDir.exists() || !localWWWDir.isDirectory || localWWWDir.listFiles.size == 0) {
         sys.error(s"The specified local WWW directory $localWWWDir is nonexistent or empty")
       }
+      println(s"Website upload initiating: ($localWWWDir -> $remoteWWWPath)")
       Utils.obtainOpalWebsiteTransport(cfgFile).withEstablished{ conn =>
-        conn.uploadDirectory(localWWWDir, conn.remoteBasePath, remoteWWWName)
-      }.get //TODO: handle Transport exceptions
+        conn.uploadDirectory(localWWWDir, remoteWWWPath)
+      }.flatten.get //TODO: handle Transport exceptions
     }
   )
 
   lazy val defaultSettings: Seq[Def.Setting[_]] = baseSettings ++ Seq(
     // defaults from sbtrelease are mostly OK, they are listed here again so the interface is clear
 
+    releasePublishArtifactsAction := publishLocal.value, //TODO: override with publishSigned task in clients, no dependency here
     releaseVersionFile := (baseDirectory in ThisProject).value / "version.sbt"
 //    releaseUseGlobalVersion := true,
 //    releaseCommitMessage - custom message
@@ -113,13 +121,10 @@ object ReleaseHelperPlugin extends AutoPlugin {
   )
 
   /**
-    * Rewires the tasks and settings provided by sbt-release that we reuse.
+    * Rewires the tasks and settings provided by sbt-release that we reuse. Currently, we don't need to.
+    * This will change with modular commands
     */
   lazy val sbtreleaseOverride: Seq[Def.Setting[_]] = sbtrelease.ReleasePlugin.projectSettings ++ Seq(
-//    releaseProcess := {
-//      println("!!!!!!!!!!!!!!!!")
-//      rhReleaseProcess.value.map(_.toReleasePluginStep)
-//    }
   )
 
   override def projectSettings: Seq[Def.Setting[_]] = defaultSettings

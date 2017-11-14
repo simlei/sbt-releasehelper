@@ -1,14 +1,44 @@
+/* BSD 2-Clause License:
+ * Copyright (c) 2009 - 2017
+ * Software Technology Group
+ * Department of Computer Science
+ * Technische Universität Darmstadt
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ *  - Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  - Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 package org.opalj.releasehelper
 
 import java.io.File
 
-import org.opalj.releasehelper.StateTransitionProcess.StateTransitionDecorator
-import sbt.{LocalProject, ProjectRef, ProjectReference, State}
-import sbtrelease.ReleasePlugin.autoImport.{ReleaseStep, releaseStepTask}
-import sbtrelease.ReleaseStateTransformations.setNextVersion
+import sbt.{State}
+import sbtrelease.ReleasePlugin.autoImport.{ReleaseStep}
 
-import scala.util.Try
-
+/**
+  * wraps state transformations that are the essential building blocks of a release process.
+  * Most of the credit goes to eed3si9n (Eugene Yokota) of sbt-release on which this builds
+  *
+  * @author Simon Leischnig
+  */
 trait StateTransitionProcess {
   def stateTransformation(state: State): State
   def staticCheck(state: State): State
@@ -70,7 +100,7 @@ case class ProcessStepExternal(cmd: String, project: File) extends StateTransiti
     import sys.process._
     val sbtcmd = "sbt \"" + cmd + "\""
     println("Executing SBT command: " + sbtcmd)
-    assert(Process(sbtcmd, project).! == 0) // TODO: can we do better?
+    Utils.errorPredicate("sbt process for another project failed on the command > $cmd")(Process(sbtcmd, project).! == 0) // TODO: can we do better?
     state
   }
 }
